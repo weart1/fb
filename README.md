@@ -156,3 +156,4 @@ destinations + logs, share links, audit log.
 - [Onboarding-3 integration guide](docs/ONBOARDING_3_INTEGRATION.md)
 - [Ad URL templates](docs/ADS_URL_TEMPLATES.md)
 - [Privacy and data handling](docs/PRIVACY.md)
+- [Вебвизор: записи сессий, тепловые карты, аналитика форм](docs/SESSION_REPLAY.md)
