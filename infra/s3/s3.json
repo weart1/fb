@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "weart",
+      "credentials": [{ "accessKey": "weart", "secretKey": "weartsecret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "weart-analytics",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "infra:up": "docker compose up -d --wait clickhouse postgres redis s3",
+    "infra:down": "docker compose down",
+    "db:migrate": "pnpm --filter @weart/queries migrate && pnpm --filter @weart/db migrate",
+    "seed": "pnpm --filter @weart/seed seed",
+    "size": "pnpm --filter @weart/sdk size"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

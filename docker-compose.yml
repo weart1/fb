@@ -1,0 +1,84 @@
+name: weart
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    ports: ["8123:8123", "9000:9000"]
+    environment:
+      CLICKHOUSE_DB: weart
+      CLICKHOUSE_USER: weart
+      CLICKHOUSE_PASSWORD: weart
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+      - ./infra/clickhouse/users.xml:/etc/clickhouse-server/users.d/weart.xml:ro
+      - ./infra/clickhouse/config.xml:/etc/clickhouse-server/config.d/weart.xml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
+      interval: 3s
+      retries: 30
+
+  postgres:
+    image: postgres:16-alpine
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_USER: weart
+      POSTGRES_PASSWORD: weart
+      POSTGRES_DB: weart
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weart"]
+      interval: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redis:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 30
+
+  # S3-compatible object storage for replays and page snapshots.
+  # MinIO no longer publishes images to Docker Hub, so local dev uses SeaweedFS (Apache-2.0).
+  # Production can point S3_* env vars at AWS S3, Cloudflare R2 or any S3 API.
+  s3:
+    image: chrislusf/seaweedfs:3.80
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-master.volumeSizeLimitMB=1024"]
+    ports: ["8333:8333"]
+    volumes:
+      - s3:/data
+      - ./infra/s3/s3.json:/etc/seaweedfs/s3.json:ro
+
+  ingest:
+    build: { context: ., dockerfile: apps/ingest/Dockerfile }
+    profiles: [apps]
+    env_file: .env
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://s3:8333
+    ports: ["4318:4318"]
+    depends_on:
+      clickhouse: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    build: { context: ., dockerfile: apps/worker/Dockerfile }
+    profiles: [apps]
+    env_file: .env
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://weart:weart@postgres:5432/weart
+    depends_on:
+      redis: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+
+volumes:
+  clickhouse:
+  postgres:
+  redis:
+  s3:

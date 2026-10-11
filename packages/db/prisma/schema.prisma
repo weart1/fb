@@ -1,0 +1,264 @@
+// Dashboard metadata: workspaces, projects, people, settings, ad spend, segments, integrations.
+// Event data never lives here; it is in ClickHouse.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  ANALYST
+  VIEWER
+}
+
+enum ConsentMode {
+  REQUIRED      // nothing is stored or sent before consent
+  NOT_REQUIRED  // tracking starts immediately; GPC still respected
+}
+
+enum AdPlatform {
+  META
+  GOOGLE
+  TIKTOK
+  OTHER
+}
+
+enum DestinationType {
+  META_CAPI
+  GOOGLE_ADS
+  TIKTOK_EVENTS
+}
+
+model Workspace {
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  projects    Project[]
+  memberships Membership[]
+  invites     Invite[]
+  auditLogs   AuditLog[]
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  lastLoginAt  DateTime?
+  memberships  Membership[]
+  sessions     AuthSession[]
+  segments     Segment[]
+  funnels      Funnel[]
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        Role
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+model AuthSession {
+  /// sha256 of the session token; the raw token only lives in the httpOnly cookie
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  email       String
+  role        Role
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdById String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id                  String      @id @default(cuid())
+  workspaceId         String
+  /// public site id used by the SDK and as `project_id` in ClickHouse
+  siteId              String      @unique
+  name                String
+  domain              String
+  timezone            String      @default("UTC")
+  currency            String      @default("USD")
+  consentMode         ConsentMode @default(REQUIRED)
+  retentionDays       Int         @default(395)
+  replayRetentionDays Int         @default(30)
+  replaySampleRate    Float       @default(0.25)
+  snapshotSampleRate  Float       @default(0.05)
+  /// form field names whose values may be captured (non-PII enums such as plan_choice)
+  captureFields       String[]    @default([])
+  createdAt           DateTime    @default(now())
+
+  workspace    Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  flows        FlowDefinition[]
+  adSpend      AdSpend[]
+  spendImports AdSpendImport[]
+  segments     Segment[]
+  funnels      Funnel[]
+  destinations ConversionDestination[]
+  shareLinks   ShareLink[]
+}
+
+model FlowDefinition {
+  id        String   @id @default(cuid())
+  projectId String
+  /// e.g. "onboarding-3"; matches `flow_id` on events
+  flowId    String
+  path      String
+  label     String
+  /// [{ step, name, label, fields: string[] }]
+  steps     Json
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, flowId])
+}
+
+model AdSpend {
+  id           String     @id @default(cuid())
+  projectId    String
+  date         DateTime   @db.Date
+  platform     AdPlatform
+  campaignId   String
+  campaignName String     @default("")
+  adsetId      String     @default("")
+  adsetName    String     @default("")
+  adId         String     @default("")
+  adName       String     @default("")
+  creativeId   String     @default("")
+  creativeName String     @default("")
+  thumbnailUrl String?
+  spend        Decimal    @db.Decimal(14, 4)
+  currency     String     @default("USD")
+  impressions  Int        @default(0)
+  clicks       Int        @default(0)
+  importId     String?
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  import       AdSpendImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, date, platform, campaignId, adsetId, adId])
+  @@index([projectId, date])
+}
+
+model AdSpendImport {
+  id         String    @id @default(cuid())
+  projectId  String
+  source     String    // "csv" | "meta_api" | "google_api" | "tiktok_api"
+  fileName   String?
+  rows       Int
+  createdAt  DateTime  @default(now())
+  createdBy  String?
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  spend      AdSpend[]
+}
+
+model Segment {
+  id        String   @id @default(cuid())
+  projectId String
+  ownerId   String
+  name      String
+  /// serialized report filters (see @weart/shared Filters)
+  filters   Json
+  shared    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+}
+
+model Funnel {
+  id        String   @id @default(cuid())
+  projectId String
+  ownerId   String
+  name      String
+  /// [{ kind: 'event' | 'page', value, filters? }]
+  steps     Json
+  windowSec Int      @default(86400)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+}
+
+model ConversionDestination {
+  id          String          @id @default(cuid())
+  projectId   String
+  type        DestinationType
+  enabled     Boolean         @default(false)
+  /// log the payload instead of calling the platform API
+  dryRun      Boolean         @default(true)
+  /// AES-256-GCM encrypted JSON with APP_SECRET; never returned to the browser
+  credentials String?
+  /// { "onboarding_completed": "CompleteRegistration", "purchase": "Purchase" }
+  eventMap    Json
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  logs        ConversionLog[]
+
+  @@unique([projectId, type])
+}
+
+model ConversionLog {
+  id            String                @id @default(cuid())
+  destinationId String
+  eventId       String
+  eventName     String
+  status        String                // "sent" | "dry_run" | "failed" | "skipped"
+  attempts      Int                   @default(1)
+  response      String?
+  createdAt     DateTime              @default(now())
+  destination   ConversionDestination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+
+  @@unique([destinationId, eventId])
+  @@index([createdAt])
+}
+
+model ShareLink {
+  id        String    @id @default(cuid())
+  projectId String
+  tokenHash String    @unique
+  /// dashboard path + serialized filter state
+  path      String
+  state     Json
+  expiresAt DateTime?
+  createdBy String
+  createdAt DateTime  @default(now())
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  actorId     String?
+  action      String
+  target      String?
+  meta        Json?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}
