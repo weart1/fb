@@ -62,6 +62,8 @@ export type WireEvent = z.infer<typeof WireEvent>;
 export const BatchContext = z.object({
   anonymous_id: uuid,
   session_id: uuid,
+  /** ms epoch when the session started (sessions are bucketed by their start date) */
+  session_start: z.number().int().nonnegative(),
   user_id: shortStr(128).optional(),
   screen_w: z.number().int().min(0).max(20000),
   screen_h: z.number().int().min(0).max(20000),
