@@ -2,7 +2,7 @@
  * Session replay + page snapshots (lazy bundle, not part of the core size budget).
  * Uses rrweb with ALL inputs masked and [data-wa-mask] text masked/blocked.
  */
-import { record } from 'rrweb';
+import { record } from '@rrweb/record';
 import type { Core } from './core';
 import { now } from './util';
 
@@ -12,15 +12,14 @@ const CHUNK_MS = 10_000;
 const CHUNK_MAX_EVENTS = 1000;
 
 export function startReplay(core: Core, opts: { replay: boolean; snapshot: boolean } = { replay: true, snapshot: false }): () => void {
-  if (core.consent !== 'granted' && core.opts.consent !== 'not-required') {
-    // wait for consent before recording
-    const id = setInterval(() => {
-      if (core.consent === 'granted') {
-        clearInterval(id);
-        startReplay(core, opts);
-      }
-    }, 1000);
-    return () => clearInterval(id);
+  if (core.consent === 'denied') return () => undefined;
+  if (core.consent !== 'granted') {
+    // start recording the moment consent is granted
+    let stopLater: (() => void) | undefined;
+    core.consentHooks.push(() => {
+      stopLater = startReplay(core, opts);
+    });
+    return () => stopLater?.();
   }
   const endpoint = core.opts.endpoint;
   const site = core.opts.siteId;

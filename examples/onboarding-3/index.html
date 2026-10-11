@@ -17,6 +17,8 @@
       endpoint: window.WEART_ENDPOINT || 'http://localhost:4318',
       consent: 'required',
       captureFields: ['style_choice', 'goal', 'experience_level', 'plan_choice', 'billing_period'],
+      // demo only: ?wa_replay=1 forces session recording for this visit
+      replay: /wa_replay=1/.test(location.search) ? { sampleRate: 1 } : undefined,
       debug: true
     });
   </script>

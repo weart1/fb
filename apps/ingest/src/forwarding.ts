@@ -45,7 +45,7 @@ export class BullConversionSink implements ConversionSink {
         name: data.event,
         data,
         opts: {
-          jobId: `${data.project_id}:${data.event_id}`, // idempotent
+          jobId: `${data.project_id}-${data.event_id}`, // idempotent (BullMQ ids cannot contain ":")
           attempts: 8,
           backoff: { type: 'exponential', delay: 5000 },
           removeOnComplete: true,

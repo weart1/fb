@@ -15,7 +15,7 @@ await Promise.all([
   build({ ...common, entryPoints: ['src/replay.ts'], outfile: 'dist/weart-replay.js', format: 'iife', minify: true }),
   // npm (ESM) entries
   build({ ...common, entryPoints: ['src/index.ts'], outfile: 'dist/index.js', format: 'esm', minify: false }),
-  build({ ...common, entryPoints: ['src/replay.ts'], outfile: 'dist/replay.js', format: 'esm', external: ['rrweb'] }),
+  build({ ...common, entryPoints: ['src/replay.ts'], outfile: 'dist/replay.js', format: 'esm', external: ['@rrweb/record'] }),
 ]);
 
 if (!sizeOnly) {

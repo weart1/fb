@@ -50,6 +50,7 @@ export class Core {
   /** Called when the tab is hidden, on SPA route changes, and on unload */
   readonly leaveHooks: Hook[] = [];
   readonly sessionHooks: Array<(sessionId: string) => void> = [];
+  readonly consentHooks: Array<() => void> = [];
   pageviewId = '';
 
   private anonId: string;
@@ -230,6 +231,7 @@ export class Core {
       this.store.set('wa_consent', 'granted', 365);
       this.track('$consent', { state });
       this.flush();
+      for (const h of this.consentHooks.splice(0)) h();
     } else {
       this.queue = [];
       for (const k of ['wa_id', 'wa_s', 'wa_uid', 'wa_ft', 'wa_lt', 'wa_x']) this.store.remove(k);
