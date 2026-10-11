@@ -31,13 +31,9 @@ export async function setup(opts: {
       return new Response(null, { status: opts.fetchStatus ?? 202 });
     }),
   );
-  Object.defineProperty(navigator, 'sendBeacon', {
-    configurable: true,
-    value: (url: string, data: Blob) => {
-      void data.text().then((t) => sent.push({ url, body: Batch.parse(JSON.parse(t)) }));
-      return true;
-    },
-  });
+  // jsdom Blobs cannot be read back by Node's Response; report beacon as unavailable so the SDK
+  // falls back to fetch(keepalive), which the mock above captures.
+  Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: () => false });
   const { weart } = await import('../src/index');
   weart.init({
     siteId: 'weartstudio',

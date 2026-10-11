@@ -7,8 +7,8 @@ const MAX_PER_PAGE = 25;
 export function captureErrors(core: Core, network: boolean): void {
   const seen = new Set<string>();
   let count = 0;
-  core.leaveHooks.push((final) => {
-    if (final) {
+  core.leaveHooks.push((reason) => {
+    if (reason !== 'hidden') {
       seen.clear();
       count = 0;
     }

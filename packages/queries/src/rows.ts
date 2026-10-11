@@ -143,3 +143,16 @@ export function emptyEventRow(): EventRow {
     properties: '{}', sdk_version: '', has_replay: 0,
   };
 }
+
+/** ms epoch → ClickHouse DateTime64(3) literal in UTC ('YYYY-MM-DD HH:MM:SS.mmm'). */
+export function chTime(ms: number): string {
+  return new Date(ms).toISOString().replace('T', ' ').replace('Z', '');
+}
+
+const EVENT_TIME_FIELDS = ['ts', 'received_at', 'session_start', 'ft_ts'] as const;
+
+export type SerializedEventRow = Omit<EventRow, (typeof EVENT_TIME_FIELDS)[number]> & Record<(typeof EVENT_TIME_FIELDS)[number], string>;
+
+export function serializeEventRow(r: EventRow): SerializedEventRow {
+  return { ...r, ts: chTime(r.ts), received_at: chTime(r.received_at), session_start: chTime(r.session_start), ft_ts: chTime(r.ft_ts) };
+}

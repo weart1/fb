@@ -26,8 +26,8 @@ export function captureScroll(core: Core): () => number {
   on(window, 'scroll', () => {
     if (!raf) raf = requestAnimationFrame(measure);
   });
-  core.leaveHooks.push((final) => {
-    if (!final) return;
+  core.leaveHooks.push((reason) => {
+    if (reason === 'hidden') return;
     max = 0;
     fired = new Set();
   });

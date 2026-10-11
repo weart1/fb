@@ -1,4 +1,4 @@
-import type { Core } from '../core';
+import type { Core, LeaveReason } from '../core';
 import { now, on, uuidv7 } from '../util';
 
 /**
@@ -11,7 +11,8 @@ export function capturePageviews(core: Core, getScrollMax: () => number): () => 
   let reported = { active: 0, visible: 0 };
   let startedAt = now();
 
-  const leave = (final: boolean): void => {
+  const leave = (reason: LeaveReason): void => {
+    const final = reason !== 'hidden';
     const snap = core.activity.snapshot();
     const active = snap.active - reported.active;
     const visible = snap.visible - reported.visible;
@@ -38,7 +39,7 @@ export function capturePageviews(core: Core, getScrollMax: () => number): () => 
     const next = location.pathname + location.search;
     if (next === path) return;
     // Leave hooks (scroll reset, form abandon, flow bookkeeping) run before the new page view.
-    for (const h of core.leaveHooks) h(true);
+    for (const h of core.leaveHooks) h('route');
     path = next;
     view();
   };

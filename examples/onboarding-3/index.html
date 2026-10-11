@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>weart studio · onboarding (SDK reference integration)</title>
+  <!--
+    Reference integration of the weart SDK on /onboarding-3.
+    1) Snippet: queues calls until the SDK loads (async, never blocks rendering).
+    2) Each step calls ob.step(n, name); advancing auto-completes the previous step with its duration.
+    3) Validation errors call ob.error(field, code); the final step calls ob.finish().
+  -->
+  <script>
+    !function(w,n){var q=w[n]=w[n]||function(){(q.q=q.q||[]).push(arguments)};q.q=q.q||[]}(window,'weart');
+    weart('init', {
+      siteId: 'weartstudio',
+      endpoint: window.WEART_ENDPOINT || 'http://localhost:4318',
+      consent: 'required',
+      captureFields: ['style_choice', 'goal', 'experience_level', 'plan_choice', 'billing_period'],
+      debug: true
+    });
+  </script>
+  <script async src="http://localhost:4318/sdk/weart.js"></script>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; background: #0A1124; color: #E6ECF7; margin: 0; }
+    main { max-width: 440px; margin: 48px auto; padding: 24px; background: #111A33; border: 1px solid #1F2C4D; border-radius: 12px; }
+    .progress { color: #8A9BC2; font-size: 13px; margin-bottom: 12px; }
+    label { display: block; margin: 12px 0 4px; color: #8A9BC2; }
+    input, select { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid #1F2C4D; background: #17223F; color: #E6ECF7; }
+    input[aria-invalid=true] { border-color: #EF4444; }
+    .err { color: #EF4444; font-size: 13px; min-height: 18px; }
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .choice { padding: 14px; border: 1px solid #1F2C4D; border-radius: 8px; cursor: pointer; text-align: center; }
+    .choice.on { border-color: #3B82F6; background: #17223F; }
+    button { margin-top: 20px; width: 100%; padding: 12px; border: 0; border-radius: 8px; background: #3B82F6; color: white; font-weight: 600; cursor: pointer; }
+    button.ghost { background: transparent; color: #8A9BC2; margin-top: 8px; }
+    #consent { position: fixed; bottom: 16px; left: 16px; right: 16px; max-width: 520px; margin: auto; padding: 16px; background: #17223F; border: 1px solid #1F2C4D; border-radius: 12px; }
+    #consent button { width: auto; padding: 8px 14px; margin: 8px 8px 0 0; }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <div id="consent">
+    We use first-party analytics to improve onboarding.
+    <div><button id="accept">Accept</button><button id="decline" class="ghost">Decline</button></div>
+  </div>
+  <script>
+    document.getElementById('accept').onclick = () => { weart('consent', 'granted'); document.getElementById('consent').remove(); };
+    document.getElementById('decline').onclick = () => { weart('consent', 'denied'); document.getElementById('consent').remove(); };
+
+    const STEPS = [
+      { n: 1, name: 'intro' }, { n: 2, name: 'style' }, { n: 3, name: 'goals' },
+      { n: 4, name: 'details' }, { n: 5, name: 'plan' }, { n: 6, name: 'checkout' },
+    ];
+    let ob;
+    const state = { step: 1 };
+
+    function render() {
+      const s = STEPS[state.step - 1];
+      // SPA route per step, so pageviews/paths/heatmaps can also be split by URL
+      const url = new URL(location.href);
+      url.searchParams.set('step', s.name);
+      history.pushState({}, '', url);
+      ob.step(s.n, s.name);
+      const app = document.getElementById('app');
+      const progress = `<div class="progress">Step ${s.n} of ${STEPS.length}</div>`;
+      const views = {
+        intro: `<h2>Create your art studio</h2><p>Answer 5 quick questions.</p><button data-wa="ob-start" id="next">Get started</button>`,
+        style: `<h2>Pick a style</h2><div class="choices">${['Minimal','Bold','Retro','Abstract'].map(c => `<div class="choice" data-wa="style-${c.toLowerCase()}">${c}</div>`).join('')}</div>
+                <input type="hidden" name="style_choice" id="style_choice"><button id="next">Continue</button>`,
+        goals: `<h2>Your goals</h2><label>Goal</label><select name="goal"><option value="">Choose…</option><option>sell prints</option><option>portfolio</option><option>hobby</option></select>
+                <label>Experience</label><select name="experience_level"><option>beginner</option><option>pro</option></select><button id="next">Continue</button>`,
+        details: `<h2>Your details</h2><label>First name</label><input name="first_name" autocomplete="given-name">
+                <label>Email</label><input name="email" type="email" required aria-describedby="email-err"><div class="err" id="email-err"></div>
+                <button id="next">Continue</button><button class="ghost" id="back">Back</button>`,
+        plan: `<h2>Choose a plan</h2><select name="plan_choice"><option>basic</option><option>pro</option></select>
+                <select name="billing_period"><option>monthly</option><option>yearly</option></select><button id="next">Continue</button>`,
+        checkout: `<h2>Checkout</h2><label>Card number</label><input name="card_number" autocomplete="cc-number"><button id="next">Pay $29</button>`,
+      };
+      app.innerHTML = progress + views[s.name];
+      app.querySelectorAll('.choice').forEach(el => el.onclick = () => {
+        app.querySelectorAll('.choice').forEach(c => c.classList.remove('on')); el.classList.add('on');
+        document.getElementById('style_choice').value = el.textContent;
+      });
+      const back = document.getElementById('back');
+      if (back) back.onclick = () => { state.step--; render(); };
+      document.getElementById('next').onclick = () => {
+        if (s.name === 'details') {
+          const email = app.querySelector('[name=email]');
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.value)) {
+            email.setAttribute('aria-invalid', 'true');
+            document.getElementById('email-err').textContent = 'Please enter a valid email';
+            ob.error('email', 'invalid_format');
+            return;
+          }
+          weart.hashEmail(email.value).then(h => weart.identify('u_' + h.slice(0, 12), { email_hash: h }));
+        }
+        if (s.name === 'checkout') {
+          weart.revenue({ amount: 29, currency: 'USD', order_id: 'demo_' + Date.now() });
+          ob.finish({ plan: 'pro' });
+          app.innerHTML = '<h2>Welcome to weart studio 🎉</h2>';
+          return;
+        }
+        state.step++; render();
+      };
+    }
+    weart('ready', () => { ob = weart.flow('onboarding-3', { version: 'v3' }); render(); });
+  </script>
+</body>
+</html>

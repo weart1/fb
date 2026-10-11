@@ -27,7 +27,9 @@ interface FlowCtx {
 }
 
 type Batch = { site: string; sdk: string; sent_at: number; ctx: BatchContext; events: WireEvent[] };
-type Hook = (final: boolean) => void;
+/** hidden: tab hidden (may come back) · route: SPA navigation · unload: page is going away */
+export type LeaveReason = 'hidden' | 'route' | 'unload';
+type Hook = (reason: LeaveReason) => void;
 
 /**
  * The SDK runtime. Capture modules call `track`; this class owns identity, sessions,
@@ -45,7 +47,7 @@ export class Core {
   lastField = '';
   /** Timestamp of the last network request start (dead-click detection) */
   lastNetwork = 0;
-  /** Called on page hide (final=false) and unload/route change (final=true) */
+  /** Called when the tab is hidden, on SPA route changes, and on unload */
   readonly leaveHooks: Hook[] = [];
   readonly sessionHooks: Array<(sessionId: string) => void> = [];
   pageviewId = '';
@@ -85,13 +87,13 @@ export class Core {
 
     this.activity = new Activity(
       () => {
-        for (const h of this.leaveHooks) h(false);
+        for (const h of this.leaveHooks) h('hidden');
         this.flush(true);
       },
       () => this.touchSession(),
     );
     on(window, 'pagehide', () => {
-      for (const h of this.leaveHooks) h(true);
+      for (const h of this.leaveHooks) h('unload');
       this.flush(true);
     });
     on(window, 'online', () => this.retry());

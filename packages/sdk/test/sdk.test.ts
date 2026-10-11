@@ -243,3 +243,31 @@ describe('experiments', () => {
     expect(exposures[0]!.ctx.experiments).toEqual({ ob_style_step: v });
   });
 });
+
+describe('SPA navigation is not abandonment', () => {
+  it('route changes between steps do not emit onboarding_abandoned or $form_abandon; unload does', async () => {
+    document.body.innerHTML = '<input name="email" />';
+    const { weart, flush, sent } = await setup({});
+    const ob = weart.flow('onboarding-3');
+    ob.step(1, 'intro');
+    const input = document.querySelector('input')!;
+    input.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    history.pushState({}, '', '/onboarding-3?step=style');
+    await tick(5);
+    ob.step(2, 'style');
+    flush();
+    await tick();
+    let names = events(sent).map((e) => e.name);
+    expect(names).toContain('$pageleave');
+    expect(names).not.toContain('onboarding_abandoned');
+    expect(names).not.toContain('$form_abandon');
+
+    window.dispatchEvent(new Event('pagehide'));
+    await tick(5);
+    names = events(sent).map((e) => e.name);
+    const abandoned = events(sent).find((e) => e.name === 'onboarding_abandoned');
+    expect(abandoned?.props).toMatchObject({ last_step: 2, step: 2, last_field: 'email' });
+    expect(names).toContain('$form_abandon');
+  });
+});

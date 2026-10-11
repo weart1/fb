@@ -113,8 +113,9 @@ export function captureForms(core: Core): void {
     });
   });
 
-  core.leaveHooks.push((final) => {
-    if (!final) return;
+  core.leaveHooks.push((reason) => {
+    // SPA step changes are not abandonment; only a real unload with unsubmitted fields is
+    if (reason !== 'unload') return;
     for (const [owner, fields] of touched) {
       if (submitted.has(owner)) continue;
       core.track('$form_abandon', {

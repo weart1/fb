@@ -24,9 +24,10 @@ export class Flow {
     readonly id: string,
     private readonly version = '',
   ) {
-    core.leaveHooks.push((final) => {
-      // best-effort abandonment signal; drop-off is also derived server-side from flow_steps
-      if (final && this.current && !this.done && core.flowCtx?.flow_id === this.id) {
+    core.leaveHooks.push((reason) => {
+      // best-effort abandonment signal on real unload (SPA step changes are not abandonment);
+      // drop-off is also derived server-side from flow_steps for mobile tabs that never unload
+      if (reason === 'unload' && this.current && !this.done && core.flowCtx?.flow_id === this.id) {
         this.emit('onboarding_abandoned', {
           last_step: this.current.step,
           last_step_name: this.current.name,

@@ -2,7 +2,9 @@
   "name": "weart-analytics",
   "private": true,
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
@@ -13,9 +15,12 @@
     "infra:down": "docker compose down",
     "db:migrate": "pnpm --filter @weart/queries migrate && pnpm --filter @weart/db migrate",
     "seed": "pnpm --filter @weart/seed seed",
-    "size": "pnpm --filter @weart/sdk size"
+    "size": "pnpm --filter @weart/sdk size",
+    "e2e": "playwright test"
   },
   "devDependencies": {
+    "@clickhouse/client": "^1.24.1",
+    "@playwright/test": "1.49.1",
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
     "turbo": "^2.3.3",
