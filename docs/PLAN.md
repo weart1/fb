@@ -1,6 +1,8 @@
-# weart analytics: architecture plan (v0, awaiting approval)
+# weart analytics: architecture plan
 
-Status: **proposal**. Nothing is built yet. The repo (`weart1/fb`) was empty when this was written, so there are no constraints from existing code.
+Status: **approved, milestone 1 done** (SDK, ingest, schema, seed, conversion forwarding in dry-run).
+The original plan below was written for the first brief; the extended brief changes it as described in
+"Extended scope" at the end. Where they differ, the extended scope and the README "Decisions" table win.
 
 ---
 
@@ -329,3 +331,37 @@ Design tokens: the palette you specified as CSS variables mapped into Tailwind (
 3. User explorer + journey timeline + step drill-down
 4. Session replay + Paths (Sankey) + Real-time
 5. Cohorts, segments, event explorer, exports/share links, conversion forwarding stubs, polish, README
+
+
+---
+
+## 11. Extended scope (second brief)
+
+Changes to the stack:
+
+- **`apps/worker`** (BullMQ on **Redis**): conversion forwarding (Meta CAPI, Google Ads enhanced
+  conversions, TikTok Events API), remote-config publishing, and later ad-platform imports,
+  anomaly detection, alerts and scheduled reports.
+- **Object storage (S3 API)** for replays and page snapshots, instead of ClickHouse blobs.
+  Local dev uses SeaweedFS, because MinIO images are no longer published.
+- Roles are **owner / admin / analyst / viewer**, with invites, multiple projects and an audit log
+  (already in the Prisma schema).
+- SDK additions: web vitals, in-app browser detection (server-side), page snapshots for heatmaps,
+  `getVariant()` (deterministic bucketing, `$exposure`), `revenue()`.
+
+Additional ClickHouse tables (already created): `replay_chunks`, `page_snapshots` (S3 index),
+`ingest_stats`. Heatmap aggregates, web-vitals rollups, anomaly baselines and experiment results
+are added in their milestones as materialized views on `events`.
+
+| Milestone | Scope |
+|---|---|
+| 1 ✅ | SDK + ingestion + schema + seed + conversion forwarding (dry-run) |
+| 2 | Dashboard shell (auth, filters, ⌘K), Overview, Campaigns (+ CSV spend import, first/last touch), Onboarding funnel |
+| 3 | User explorer + journey timeline, step drill-down |
+| 4 | Session replay player, Paths (Sankey), Real-time |
+| 5 | Cohorts, segments, event explorer, exports, share links, polish |
+| 6 | Heatmaps (click/move/scroll over snapshots, per step, segment compare), form analytics, friction score, frustration session finder |
+| 7 | Meta / Google / TikTok Ads OAuth imports, full-funnel ad report, creative analytics, click-to-landing loss, multi-touch attribution models, Stripe revenue (LTV, payback, refunds) |
+| 8 | Feature flags + experiments (Bayesian + frequentist, SRM), annotations |
+| 9 | Anomaly detection, alerts (Telegram/Slack/email), AI insights (LLM gets aggregates only), drop-off prediction |
+| 10 | Web vitals reports, error monitoring, user profiles + lifecycle stages, retargeting audiences, custom dashboards (dnd-kit), scheduled reports, public API + webhooks, multi-project workspace, GDPR tools |

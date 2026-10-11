@@ -7,7 +7,7 @@
   "scripts": {
     "migrate": "node --env-file-if-exists=../../.env --import tsx src/migrate.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@clickhouse/client": "^1.10.0",
